@@ -23,14 +23,6 @@ import SegmentRegistration
 # pip_install('keras==2.6.0')
 #pip_install('scikit-image')
 #pip_install('open3d==0.14.1') 
-# Prostate
-# print packages:
-# import pkg_resources
-# installed_packages = pkg_resources.working_set
-# installed_packages_list = sorted(["%s==%s" % (i.key, i.version)
-   # for i in installed_packages])
-# print(installed_packages_list)
-#To replace resliced image set IJkToRASMat (from original scan) as top transform followed by T = imageResliceForeground.GetResliceTransform()
 
 class Prostate(ScriptedLoadableModule):
   """Uses ScriptedLoadableModule base class, available at:
@@ -194,26 +186,26 @@ class ProstateWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
     self.ui.metricsButton.connect('clicked(bool)', self.metrics)
     # Make sure parameter node is initialized (needed for module reload)
 
-  # Method to set the ground truth model
+  '''Method to set the ground truth model'''
   def onGTChanged(self):
     self.GTNode = self.ui.GTSelector.currentNode()
   
-  # Method to set the predicted model
+  '''Method to set the predicted/registered model'''
   def onPredChanged(self):
     self.predNode = self.ui.RegZoneSelector.currentNode()
 
-  # method to set the input volume -this will always be the Ultrasound volume
+  '''Method to set the input volume -this will always be the Ultrasound volume'''
   def onInputVolumeChanged(self):
     # if self.ui.inputSelector.currentNode() is None:
     self.inputVolume = self.ui.inputSelector.currentNode() 
     slicer.app.layoutManager().setLayout(slicer.vtkMRMLLayoutNode.SlicerLayoutFourUpView)
     self.ui.setSliceButton.enabled=True 
 
-  # set the MR volume 
+  '''Method to set the MR volume'''
   def onMRVolumeChanged(self):
     self.MRVolume = self.ui.MRVolumeSelector.currentNode()
 
-    # it auto rotates 90 degrees to match with the reconstructed prostate. Might not be necessary with diff types of data
+    # it auto rotates 90 degrees to match with the reconstructed prostate. Might not be necessary with different types of data
     T = vtk.vtkTransform()
     T.RotateX(-90)
     rotateTransform = slicer.mrmlScene.AddNewNodeByClass('vtkMRMLLinearTransformNode')
@@ -222,12 +214,12 @@ class ProstateWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
     self.MRVolume.HardenTransform()
     slicer.mrmlScene.RemoveNode(rotateTransform) 
 
-  # set the MRI prostate model
+  '''Method to set the MRI prostate capsule model'''
   def onModelChanged(self):
     self.modelNode = self.ui.modelSelector.currentNode() 
     self.ui.registerButton.enabled=True
 
-    # it auto rotates 90 degrees to match with the reconstructed prostate. Might not be necessary with diff types of data
+    # it auto rotates 90 degrees to match with the reconstructed prostate. Might not be necessary with different types of data
     T = vtk.vtkTransform()
     T.RotateX(-90)
     rotateTransform = slicer.mrmlScene.AddNewNodeByClass('vtkMRMLLinearTransformNode')
@@ -236,12 +228,12 @@ class ProstateWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
     self.modelNode.HardenTransform()
     slicer.mrmlScene.RemoveNode(rotateTransform) 
 
-  # set the PZ model
+  '''Method to set the PZ model. This model should originate from the same data as the MRI volume and MRI prostate capsule'''
   def onZoneChanged(self):
     self.pzNode = self.ui.zoneSelector.currentNode() 
     self.ui.invertButton.enabled=True
 
-    # it auto rotates 90 degrees to match with the reconstructed prostate. Might not be necessary with diff types of data
+    # it auto rotates 90 degrees to match with the reconstructed prostate. Might not be necessary with different types of data
     T = vtk.vtkTransform()
     T.RotateX(-90)
     rotateTransform = slicer.mrmlScene.AddNewNodeByClass('vtkMRMLLinearTransformNode')
@@ -250,7 +242,7 @@ class ProstateWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
     self.pzNode.HardenTransform()
     slicer.mrmlScene.RemoveNode(rotateTransform) 
 
-  # Set up the deformable registration
+  '''Method to set up the deformable registration. This makes use of the Segment Registration module'''
   def onRegClicked(self):
     s = slicer.mrmlScene
 
@@ -263,7 +255,7 @@ class ProstateWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
     widget = SegmentRegistration.SegmentRegistrationWidget() # this will open the segment registration widget -user input required
 
   
-  # fix all the transforms to set the PZ on the TRUS properly
+  '''Method to fix all the transforms to set the PZ on the TRUS properly'''
   def onInvertClicked(self):
     s = slicer.mrmlScene
 
@@ -271,7 +263,6 @@ class ProstateWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
     self.inputVolume.SetAndObserveTransformNodeID(None)  #remove the transform from the TRUS
 
     #prealign.Inverse()    
-    #self.inputVolume.SetAndObserveTransformNodeID(prealign.GetID()) #shift the TRUS back to its original state
     self.finalModel.SetAndObserveTransformNodeID(prealign.GetID()) #shift the TRUS model to new coordinates
 
     # hide the segmentations
@@ -280,19 +271,16 @@ class ProstateWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
     displayNode = self.modelSeg.GetDisplayNode()
     displayNode.SetAllSegmentsVisibility(False) 
 
-    #get and invert the transform. Apply it to the MRI model
+    # get and invert the transform. Apply it to the MRI model
     transform = s.GetFirstNodeByName( "Deformable Transform")
     transform.Inverse()
-    #self.modelNode.SetAndObserveTransformNodeID(prealign.GetID())
-    #self.modelNode.HardenTransform()
     self.modelNode.SetAndObserveTransformNodeID(transform.GetID())
 
-    #apply to zone
-    #self.pzNode.SetAndObserveTransformNodeID(prealign.GetID())
-    #self.pzNode.HardenTransform()
+    # apply to the zone
     self.pzNode.SetAndObserveTransformNodeID(transform.GetID())
 
 
+  '''Some methods necessary for running the U-net'''
   def dice_coef_loss(self, y_true, y_pred):
     return -dice_coef(y_true, y_pred)
 
@@ -307,7 +295,7 @@ class ProstateWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
     self.x = np.expand_dims( cv2.resize(im,[256,256]), axis=2)
     self.out = self.UNetModel.predict(np.expand_dims(self.x, axis=0))
 
-  # Run the reconstruction
+  '''Method to run the reconstruction step'''
   def onsetSliceClicked(self):
     inputVolumeNode = self.inputVolume
     observerTag = None
@@ -320,13 +308,11 @@ class ProstateWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
     # Compute reslice transformation
     self.volumeToIjkMatrix = vtk.vtkMatrix4x4()
     inputVolumeNode.GetRASToIJKMatrix(self.volumeToIjkMatrix)
-    #inputVolumeNode.GetIJKToRASDirectionMatrix(volumeToIjkMatrix)
 
     b = [0,0,0,0,0,0]
     inputVolumeNode.GetBounds(b) 
 
     T = vtk.vtkTransform()
-    #T.Translate(-b[0]/2,-b[2]/2, -b[-1]/2) 
     T.RotateX(-90)
     centerTransform = slicer.mrmlScene.AddNewNodeByClass('vtkMRMLLinearTransformNode')
     centerTransform.SetAndObserveTransformToParent(T) 
@@ -398,6 +384,7 @@ class ProstateWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
     self.performRecon() 
     inputVolumeNode.HardenTransform()
 
+  '''Method which allows the radial slicing and reconstruction to run in one click'''
   def updateReslice(self, event, caller):
     try:
       slicer.app.pauseRender()
@@ -417,6 +404,7 @@ class ProstateWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
     finally:
       slicer.app.resumeRender()
 
+  '''Method to rotate the TRUS to the correct orientation for the U-Net'''
   def applyRotation(self,outputNode,deg,sliceToRasNode): 
     b = [0,0,0,0,0,0]
     self.inputVolume.GetBounds(b) 
@@ -428,11 +416,11 @@ class ProstateWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
     sliceToRasNode.SetMatrixTransformToParent(mat) 
     outputNode.GetDisplayNode().SetWindowLevelMinMax(0,178)
 
+  '''Method to segment each radial slice'''
   def getSegmentationFromSlice(self, outputNode, sliceToRasNode,deg):
     self.npImage = np.squeeze(slicer.util.arrayFromVolume(outputNode))
     b = [0,0,0,0,0,0]
     outputNode.GetBounds(b) 
-    # self.npImage = vtk.util.numpy_support.vtk_to_numpy(imageData.GetPointData().GetScalars())
     self.segmentation = slicer.mrmlScene.AddNewNodeByClass('vtkMRMLLabelMapVolumeNode')
     self.segmentation.SetName('seg'+str(deg))
     self.padL = int(np.ceil((510 - self.npImage.shape[0]) / 2)) - np.mod(self.npImage.shape[0], 2)
@@ -475,6 +463,7 @@ class ProstateWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
     slicer.mrmlScene.RemoveNode(self.segmentation)
     self.prostateSeg.RemoveSegment('seg'+str(deg))
 
+  # combine all segmented slices to reconstruct the whole prostate gland
   def performRecon(self):
     outputNode = slicer.mrmlScene.GetFirstNodeByName("OutputVolume")
     sliceToRasNode = slicer.mrmlScene.GetFirstNodeByName("SliceToRas")
@@ -491,7 +480,7 @@ class ProstateWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
 
     self.ui.registerButton.enabled=True 
 
-  
+  '''Method to produce the reconstructed prostate model'''
   def onModelButtonClicked(self):
     out = self.APD.GetOutput()
     self.edge.SetInputData(out)
@@ -507,8 +496,7 @@ class ProstateWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
     pcd.normals = o3d.utility.Vector3dVector(normals)
 
     poisson_mesh = o3d.geometry.TriangleMesh.create_from_point_cloud_poisson(pcd, depth=depth, width=0, scale=1.1, linear_fit=False)[0]
-    # o3d.visualization.draw_geometries([poisson_mesh])
-
+   
     outputPath = self.path + './/Resources//Models//'
     poisson_mesh = o3d.geometry.TriangleMesh.compute_triangle_normals(poisson_mesh)
     o3d.io.write_triangle_mesh(outputPath + "mesh.stl", poisson_mesh)
@@ -525,12 +513,11 @@ class ProstateWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
     slicer.mrmlScene.RemoveNode(Tnode) 
     DN = self.finalModel.GetDisplayNode() 
     DN.SetSliceIntersectionVisibility(1)
-    # DN.SetSliceIntersectionOpacity(0.25)
     slicer.app.layoutManager().sliceWidget('Red').sliceLogic().GetSliceNode().SetSliceVisible(True)
     slicer.app.layoutManager().setLayout(slicer.vtkMRMLLayoutNode.SlicerLayoutFourUpView)
 
 
-  # get quantitative metrics between a GT model and a predicted model
+  '''Method to get quantitative metrics between a GT model and a predicted model'''
   def metrics(self):
     
     Predictedmodel = self.predNode
